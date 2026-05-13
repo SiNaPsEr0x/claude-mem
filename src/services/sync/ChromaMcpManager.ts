@@ -105,9 +105,15 @@ export class ChromaMcpManager {
     const spawnEnvironment = this.getSpawnEnv();
     getSupervisor().assertCanSpawn('chroma mcp');
 
-    const isWindows = process.platform === 'win32';
-    const uvxSpawnCommand = isWindows ? (process.env.ComSpec || 'cmd.exe') : 'uvx';
-    const uvxSpawnArgs = isWindows ? ['/c', 'uvx', ...commandArgs] : commandArgs;
+    // Always spawn uvx directly across platforms. The previous Windows-only
+    // cmd.exe /c wrapper caused chroma-mcp to fail in ~30ms because cmd.exe
+    // parses --with version specifiers (e.g. onnxruntime>=1.20, protobuf<7)
+    // as I/O redirection operators (> and <), so the Python subprocess never
+    // received the intended argv. Node/Bun spawn (via cross-spawn) already
+    // resolves `uvx` -> `uvx.exe` on PATH on Windows, matching the behaviour
+    // on macOS/Linux. Fixes #2426; supersedes #1190 / #1192 / #1199.
+    const uvxSpawnCommand = 'uvx';
+    const uvxSpawnArgs = commandArgs;
 
     logger.info('CHROMA_MCP', 'Connecting to chroma-mcp via MCP stdio', {
       command: uvxSpawnCommand,
